@@ -1,0 +1,32 @@
+allprojects {
+    afterEvaluate { p ->
+        if (p.path == ':expo-dev-launcher') {
+            def androidExt = p.extensions.findByName('android')
+
+            println "\n===== DIAGNOSTICO EXPO DEV LAUNCHER ====="
+
+            ['main', 'debug', 'release', 'debugOptimized'].each { name ->
+                def sourceSet = androidExt.sourceSets.findByName(name)
+
+                if (sourceSet != null) {
+                    println "\nSOURCE SET: ${name}"
+
+                    sourceSet.java.srcDirs.each { dir ->
+                        println "PASTA: ${dir}"
+                        println "EXISTE: ${dir.exists()}"
+
+                        if (dir.exists()) {
+                            fileTree(dir).matching {
+                                include '**/DevLauncherPackageDelegate.kt'
+                            }.files.each {
+                                println "CLASSE ENCONTRADA: ${it}"
+                            }
+                        }
+                    }
+                }
+            }
+
+            println "\n===== FIM ====="
+        }
+    }
+}

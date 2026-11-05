@@ -1,0 +1,13 @@
+const C = {
+  fundo: '#C9C3E6',
+  branco: '#FFFFFF',
+  texto: '#30364D',
+  secundario: '#65708F',
+  azul: '#5574B8',
+  azulClaro: '#E9EDFA',
+  rosa: '#C65B69',
+  rosaClaro: '#FBECEF',
+  verde: '#4B8B76',
+  borda: '#E7EAF4',
+  roxo: '#7A6BB5',
+};

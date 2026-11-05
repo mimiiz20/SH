@@ -1,0 +1,24 @@
+allprojects {
+    afterEvaluate { p ->
+        if (p.path == ':expo-dev-launcher') {
+            println "\n===== PLUGINS APLICADOS ====="
+            p.plugins.each {
+                println it.class.name
+            }
+
+            println "\n===== TAREFAS KOTLIN ====="
+            p.tasks.matching {
+                it.name.toLowerCase().contains('kotlin')
+            }.each {
+                println it.name
+            }
+
+            println "\n===== CONFIGURACAO KOTLIN ====="
+            def kotlinExt = p.extensions.findByName('kotlin')
+            println "Extensao Kotlin: ${kotlinExt != null}"
+            if (kotlinExt != null) {
+                println "Source sets: ${kotlinExt.sourceSets*.name}"
+            }
+        }
+    }
+}
