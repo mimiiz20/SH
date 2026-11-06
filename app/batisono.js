@@ -1,4 +1,3 @@
-
 import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
@@ -13,8 +12,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
 
 import {
-  getDatabase,
+  initializeDatabase,
   buscarUltimaMedicaoApollo,
+  buscarUltimaFrequenciaCardiaca,
   buscarEpisodiosMovimento,
   buscarResumoEpisodiosMovimento,
 } from '../database/database';
@@ -219,6 +219,16 @@ function calcularMagnitude(x, y, z) {
   );
 }
 
+function resumoEpisodiosVazio() {
+  return {
+    quantidade: 0,
+    duracao_total_ms: 0,
+    frequencia_media: null,
+    amplitude_media: null,
+    ultimo_episodio: null,
+  };
+}
+
 // ==========================================
 // COMPONENTES
 // ==========================================
@@ -242,11 +252,7 @@ function GrupoQuestionario({ grupo, questionario }) {
             { backgroundColor: `${grupo.cor}18` },
           ]}
         >
-          <Ionicons
-            name={grupo.icone}
-            size={20}
-            color={grupo.cor}
-          />
+          <Ionicons name={grupo.icone} size={20} color={grupo.cor} />
         </View>
 
         <Text style={styles.novoGrupoTitulo}>
@@ -276,12 +282,7 @@ function CartaoIndicador({
 }) {
   return (
     <View style={styles.indicadorCard}>
-      <View
-        style={[
-          styles.indicadorIcone,
-          { backgroundColor: fundo },
-        ]}
-      >
+      <View style={[styles.indicadorIcone, { backgroundColor: fundo }]}>
         <Ionicons name={icone} size={22} color={cor} />
       </View>
 
@@ -350,9 +351,7 @@ function CartaoEpisodio({ episodio, indice }) {
       </View>
 
       <View style={styles.episodioLinha}>
-        <Text style={styles.episodioLabel}>
-          Regularidade
-        </Text>
+        <Text style={styles.episodioLabel}>Regularidade</Text>
         <Text style={styles.episodioValor}>
           {formatarRegularidade(episodio.regularidade)}
         </Text>
@@ -383,17 +382,16 @@ export default function BatiSono() {
   const [questionarioSelecionado, setQuestionarioSelecionado] =
     useState(null);
 
+  // Última medição completa: acelerômetro, giroscópio e áudio.
   const [medicaoApollo, setMedicaoApollo] = useState(null);
+
+  // Último BPM válido, consultado separadamente no SQLite.
+  const [bpmApollo, setBpmApollo] = useState(null);
 
   const [episodiosApollo, setEpisodiosApollo] = useState([]);
 
-  const [resumoEpisodios, setResumoEpisodios] = useState({
-    quantidade: 0,
-    duracao_total_ms: 0,
-    frequencia_media: null,
-    amplitude_media: null,
-    ultimo_episodio: null,
-  });
+  const [resumoEpisodios, setResumoEpisodios] =
+    useState(resumoEpisodiosVazio);
 
   const [carregandoDados, setCarregandoDados] = useState(true);
   const [erroBanco, setErroBanco] = useState(false);
@@ -415,8 +413,12 @@ export default function BatiSono() {
         buscando = true;
 
         try {
-          const db = await getDatabase();
+          // Garante que o banco e suas tabelas estejam inicializados.
+          const db = await initializeDatabase();
 
+          if (!ativo) return;
+
+          // Busca o usuário que está com a sessão ativa.
           const sessao = await db.getFirstAsync(`
             SELECT usuario_id
             FROM sessao
@@ -426,25 +428,23 @@ export default function BatiSono() {
 
           if (!ativo) return;
 
+          // Se não houver usuário logado, limpa os dados da tela.
           if (!sessao?.usuario_id) {
             setHistoricoQuestionarios([]);
             setQuestionarioSelecionado(null);
             setMedicaoApollo(null);
+            setBpmApollo(null);
             setEpisodiosApollo([]);
-
-            setResumoEpisodios({
-              quantidade: 0,
-              duracao_total_ms: 0,
-              frequencia_media: null,
-              amplitude_media: null,
-              ultimo_episodio: null,
-            });
-
+            setResumoEpisodios(resumoEpisodiosVazio());
             setErroBanco(false);
+
             return;
           }
 
-          // Questionários do usuário logado.
+          // ======================================
+          // QUESTIONÁRIOS
+          // ======================================
+
           const historico = await db.getAllAsync(
             `SELECT *
              FROM questionarios
@@ -461,39 +461,59 @@ export default function BatiSono() {
           setQuestionarioSelecionado(anterior => {
             if (!historico?.length) return null;
 
-            const aindaExiste = historico.find(
+            const aindaExiste = historico.some(
               item => item.id === anterior
             );
 
             return aindaExiste ? anterior : historico[0].id;
           });
 
-          // Última medição salva pela Apollo.
+          // ======================================
+          // ÚLTIMA MEDIÇÃO COMPLETA
+          // ======================================
+
+          // Essa consulta continua sendo responsável pelos dados
+          // de acelerômetro, giroscópio e intensidade sonora.
           const medicao = await buscarUltimaMedicaoApollo();
 
           if (!ativo) return;
 
           setMedicaoApollo(medicao || null);
 
-          // Histórico dos últimos 20 episódios.
+          // ======================================
+          // ÚLTIMO BPM VÁLIDO
+          // ======================================
+
+          // Não usamos o BPM da última medição completa.
+          // Buscamos separadamente o último BPM válido para evitar
+          // que pacotes recentes com BPM null apaguem a leitura anterior.
+          const ultimoBPM = await buscarUltimaFrequenciaCardiaca();
+
+          if (!ativo) return;
+
+          setBpmApollo(ultimoBPM || null);
+
+          // ======================================
+          // HISTÓRICO DE EPISÓDIOS
+          // ======================================
+
           const episodios = await buscarEpisodiosMovimento(20);
 
           if (!ativo) return;
 
           setEpisodiosApollo(episodios || []);
 
-          // Resumo de todos os episódios registrados.
+          // ======================================
+          // RESUMO DOS EPISÓDIOS
+          // ======================================
+
           const resumo = await buscarResumoEpisodiosMovimento();
 
           if (!ativo) return;
 
-          setResumoEpisodios(resumo || {
-            quantidade: 0,
-            duracao_total_ms: 0,
-            frequencia_media: null,
-            amplitude_media: null,
-            ultimo_episodio: null,
-          });
+          setResumoEpisodios(
+            resumo || resumoEpisodiosVazio()
+          );
 
           setErroBanco(false);
         } catch (error) {
@@ -549,12 +569,28 @@ export default function BatiSono() {
     medicaoApollo?.giroscopio_z
   );
 
+  // ==========================================
+  // FREQUÊNCIA CARDÍACA
+  // ==========================================
+
+  // O BPM vem da consulta buscarUltimaFrequenciaCardiaca(),
+  // e não da última medição geral.
+  const bpmRecebido = Number(
+    bpmApollo?.frequencia_cardiaca
+  );
+
   const frequenciaCardiaca =
-    medicaoApollo?.frequencia_cardiaca != null &&
-    Number.isFinite(Number(medicaoApollo.frequencia_cardiaca)) &&
-    Number(medicaoApollo.frequencia_cardiaca) > 0
-      ? Math.round(Number(medicaoApollo.frequencia_cardiaca))
+    bpmApollo?.frequencia_cardiaca !== null &&
+    bpmApollo?.frequencia_cardiaca !== undefined &&
+    Number.isFinite(bpmRecebido) &&
+    bpmRecebido >= 1 &&
+    bpmRecebido <= 255
+      ? Math.round(bpmRecebido)
       : null;
+
+  // ==========================================
+  // ÚLTIMO EPISÓDIO
+  // ==========================================
 
   const ultimoEpisodio = episodiosApollo[0] || null;
 
@@ -580,7 +616,8 @@ export default function BatiSono() {
         <View pointerEvents="none" style={styles.glowOne} />
         <View pointerEvents="none" style={styles.glowTwo} />
 
-        {/* NAVBAR SUPERIOR ORIGINAL — MANTIDA */}
+        {/* NAVBAR SUPERIOR */}
+
         <View
           style={[
             styles.topSafeArea,
@@ -620,6 +657,7 @@ export default function BatiSono() {
             contentContainerStyle={styles.scrollContent}
           >
             {/* TÍTULO */}
+
             <View style={styles.tituloPagina}>
               <Text style={styles.titulo}>
                 Seja bem-vindo(a)!
@@ -632,7 +670,7 @@ export default function BatiSono() {
             </View>
 
             {/* ================================== */}
-            {/* BATIMENTOS CARDÍACOS — PRIMEIRO CARD */}
+            {/* BATIMENTOS CARDÍACOS */}
             {/* ================================== */}
 
             <View style={styles.card}>
@@ -671,9 +709,9 @@ export default function BatiSono() {
                   </View>
 
                   <Text style={styles.textoAguardando}>
-                    {frequenciaCardiaca
-                      ? 'Última frequência cardíaca recebida.'
-                      : 'Aguardando integração de um sensor cardíaco.'}
+                    {frequenciaCardiaca !== null
+                      ? 'Última leitura válida recebida pelo sensor'
+                      : 'Aguardando uma leitura válida do sensor MAX30102.'}
                   </Text>
                 </View>
 
@@ -786,6 +824,7 @@ export default function BatiSono() {
               </View>
 
               {/* ATIVIDADE OSCILATÓRIA */}
+
               <View style={styles.oscilacaoBox}>
                 <View style={styles.oscilacaoCabecalho}>
                   <View style={styles.oscilacaoIcone}>
@@ -798,7 +837,7 @@ export default function BatiSono() {
 
                   <View style={{ flex: 1 }}>
                     <Text style={styles.oscilacaoTitulo}>
-                      Atividade oscilatória
+                      Aúdio
                     </Text>
 
                     <Text style={styles.oscilacaoDescricao}>
@@ -1168,19 +1207,12 @@ export default function BatiSono() {
                 color={C.azul}
               />
 
-              <Text style={styles.avisoTexto}>
-                Os dados apresentados são indicadores experimentais
-                obtidos pelos sensores de movimento. A frequência e
-                a regularidade são estimativas calculadas pelo
-                processamento dos sinais. Esses resultados não
-                confirmam tremores, freezing ou qualquer condição
-                clínica e precisam de validação específica.
-              </Text>
             </View>
           </ScrollView>
         </View>
 
-        {/* NAVBAR INFERIOR ORIGINAL — MANTIDA */}
+        {/* NAVBAR INFERIOR */}
+
         <View
           style={[
             styles.bottomSafeArea,
@@ -1791,7 +1823,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
 
-  // NAVBAR INFERIOR ORIGINAL — MANTIDA
+  // NAVBAR INFERIOR
 
   bottomSafeArea: {
     backgroundColor: 'rgba(255,255,255,0.97)',

@@ -128,6 +128,8 @@ async function solicitarPermissoes() {
 function interpretarDados(valorBase64) {
   const bytes = Buffer.from(valorBase64, 'base64');
 
+  // Aceita o pacote antigo de 14 bytes
+  // e o novo pacote de 16 bytes.
   if (bytes.length < 14) {
     throw new Error('Pacote de dados incompleto.');
   }
@@ -145,18 +147,40 @@ function interpretarDados(valorBase64) {
     return valor;
   };
 
+  // NOVO: lê o BPM como inteiro sem sinal.
+  // Os bytes 14 e 15 são enviados pelo Arduino.
+  let frequenciaCardiaca = null;
+
+  if (bytes.length >= 16) {
+    const bpm =
+      bytes[14] |
+      (bytes[15] << 8);
+
+    // Zero significa que ainda não existe
+    // uma leitura válida do sensor.
+    if (bpm > 0 && bpm <= 255) {
+      frequenciaCardiaca = bpm;
+    }
+  }
+
   const timestamp = Date.now();
 
   return {
+    // Acelerômetro.
     aceleracao_x: lerInt16(0) / 1000,
     aceleracao_y: lerInt16(2) / 1000,
     aceleracao_z: lerInt16(4) / 1000,
 
+    // Giroscópio.
     giroscopio_x: lerInt16(6) / 10,
     giroscopio_y: lerInt16(8) / 10,
     giroscopio_z: lerInt16(10) / 10,
 
+    // Microfone.
     intensidade_sonora: lerInt16(12) / 10000,
+
+    // NOVO: frequência cardíaca do MAX30102.
+    frequencia_cardiaca: frequenciaCardiaca,
 
     recebido_em: new Date(timestamp).toLocaleTimeString('pt-BR'),
 
@@ -196,6 +220,7 @@ async function salvarLeitura(leitura) {
   gravacaoEmAndamento = true;
 
   try {
+    // O objeto já contém frequencia_cardiaca.
     await salvarMedicaoApollo(leitura);
 
     ultimaGravacao = agora;
@@ -254,7 +279,8 @@ function processarLeitura(leitura) {
       return null;
     }
 
-    // Atualiza os indicadores calculados.
+    // Atualiza os indicadores calculados,
+    // incluindo a frequência cardíaca.
     atualizarEstado({
       indicadores: resultado.indicadores,
     });

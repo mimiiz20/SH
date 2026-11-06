@@ -9,6 +9,7 @@
  * 4. Identificar oscilações e estimar sua frequência.
  * 5. Calcular regularidade dos intervalos.
  * 6. Detectar e finalizar episódios experimentais.
+ * 7. Receber e repassar a frequencia cardiaca do MAX30102.
  *
  * Os limites são experimentais e precisam ser
  * calibrados com dados reais do dispositivo.
@@ -120,6 +121,30 @@ function validarAmostra(dados) {
   );
 }
 
+// NOVO: validação da frequência cardíaca.
+// Não calcula BPM a partir dos movimentos.
+function obterFrequenciaCardiaca(dados) {
+  const bpm = Number(dados?.frequencia_cardiaca);
+
+  if (
+    dados?.frequencia_cardiaca === null ||
+    dados?.frequencia_cardiaca === undefined ||
+    dados?.frequencia_cardiaca === ''
+  ) {
+    return null;
+  }
+
+  if (
+    !Number.isFinite(bpm) ||
+    bpm <= 0 ||
+    bpm > 255
+  ) {
+    return null;
+  }
+
+  return Math.round(bpm);
+}
+
 function prepararAmostra(dados) {
   let instante;
 
@@ -153,6 +178,9 @@ function prepararAmostra(dados) {
       y: Number(dados.giroscopio_y),
       z: Number(dados.giroscopio_z),
     },
+
+    // NOVO: recebe o BPM calculado pelo Arduino.
+    frequencia_cardiaca: obterFrequenciaCardiaca(dados),
   };
 }
 
@@ -325,6 +353,9 @@ function analisarLista(lista) {
 
   const frequencia = calcularFrequencia(picos);
 
+  // NOVO: utiliza a leitura mais recente válida.
+  const ultimaAmostra = lista[lista.length - 1];
+
   return {
     intensidade_movimento: Number(
       intensidadeRms.toFixed(4)
@@ -349,6 +380,10 @@ function analisarLista(lista) {
     quantidade_picos: picos.length,
 
     quantidade_amostras: lista.length,
+
+    // NOVO: BPM recebido do MAX30102.
+    frequencia_cardiaca:
+      ultimaAmostra.frequencia_cardiaca ?? null,
   };
 }
 
@@ -544,6 +579,9 @@ export function processarAmostraApollo(dados) {
       aceleracaoDinamica: dinamica.magnitude,
 
       giroscopioMagnitude,
+
+      // NOVO: preserva o BPM recebido.
+      frequencia_cardiaca: amostra.frequencia_cardiaca,
     };
 
     // Guarda a amostra na janela de análise.
@@ -574,6 +612,9 @@ export function processarAmostraApollo(dados) {
       giroscopioMagnitude: Number(
         giroscopioMagnitude.toFixed(2)
       ),
+
+      // NOVO: também disponível diretamente no resultado.
+      frequencia_cardiaca: amostra.frequencia_cardiaca,
     };
 
   } catch (erro) {

@@ -805,101 +805,96 @@ const styles = StyleSheet.create({
     elevation: 10,
   },
 
-  // ==========================================
-  // NAVBAR SUPERIOR
-  // PADRÃO BATISONO.JS
-  // ==========================================
+// ==========================================
+// NAVBAR SUPERIOR
+// ==========================================
 
-  topSafeArea: {
-    backgroundColor: 'rgba(255,255,255,0.92)',
-    zIndex: 20,
-    elevation: 8,
-    width: '100%',
-    flexShrink: 0,
-    marginHorizontal: -17,
-  },
+topSafeArea: {
+  backgroundColor: 'rgba(255,255,255,0.92)',
+  borderBottomLeftRadius: 0,
+  borderBottomRightRadius: 0,
+  zIndex: 20,
+  elevation: 8,
+  width: '100%',
+  flexShrink: 0,
+},
 
-  navbar: {
-    minHeight: 75,
-    width: '100%',
-    paddingHorizontal: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
+navbar: {
+  minHeight: 75,
+  width: '100%',
+  paddingHorizontal: 20,
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+},
 
-  botaoPerfil: {
-    width: 55,
-    height: 55,
-    borderRadius: 18,
-    backgroundColor: '#C9C3E6',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginHorizontal: 10,
-  },
+botaoPerfil: {
+  width: 55,
+  height: 55,
+  borderRadius: 18,
+  backgroundColor: '#C9C3E6',
+  alignItems: 'center',
+  justifyContent: 'center',
+  marginHorizontal: 10,
+},
 
-  // ==========================================
-  // NAVBAR INFERIOR
-  // PADRÃO BATISONO.JS
-  // ==========================================
+// ==========================================
+// NAVBAR INFERIOR
+// ==========================================
 
-  bottomSafeArea: {
-    backgroundColor: 'rgba(255,255,255,0.97)',
-    paddingTop: 8,
-    shadowColor: '#30364D',
-    shadowOffset: {
-      width: 0,
-      height: -3,
-    },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 12,
-    zIndex: 20,
-    width: '100%',
-    flexShrink: 0,
-  },
+bottomSafeArea: {
+  backgroundColor: 'rgba(255,255,255,0.97)',
+  borderTopLeftRadius: 0,
+  borderTopRightRadius: 0,
+  paddingTop: 8,
+  shadowColor: '#30364D',
+  shadowOffset: { width: 0, height: -3 },
+  shadowOpacity: 0.06,
+  shadowRadius: 8,
+  elevation: 8,
+  width: '100%',
+  flexShrink: 0,
+},
 
-  bottomBar: {
-    minHeight: 59,
-    width: '100%',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-around',
-    paddingHorizontal: 5,
-  },
+bottomBar: {
+  minHeight: 59,
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'space-around',
+  paddingHorizontal: 5,
+},
 
-  navItem: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 4,
-    gap: 3,
-  },
+navItem: {
+  flex: 1,
+  alignItems: 'center',
+  justifyContent: 'center',
+  paddingVertical: 4,
+  gap: 3,
+},
 
-  navIcon: {
-    width: 37,
-    height: 32,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+navIcon: {
+  width: 37,
+  height: 32,
+  borderRadius: 12,
+  alignItems: 'center',
+  justifyContent: 'center',
+},
 
-  navIconAtivo: {
-    backgroundColor: C.azulClaro,
-  },
+navIconAtivo: {
+  backgroundColor: '#E9EDFA',
+},
 
-  navTexto: {
-    color: C.secundario,
-    fontSize: 9,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
+navTexto: {
+  color: '#65708F',
+  fontSize: 9,
+  fontWeight: '600',
+  textAlign: 'center',
+},
 
-  navTextoAtivo: {
-    color: C.texto,
-    fontWeight: '800',
-  },
-
+navTextoAtivo: {
+  color: '#30364D',
+  fontWeight: '800',
+},
   // ==========================================
   // CONTEÚDO PRINCIPAL
   // ==========================================

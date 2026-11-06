@@ -10,13 +10,11 @@ let dbPromise = null;
 let inicializacaoPromise = null;
 
 // ==========================================
-// ABRIR BANCO DE DADOS
+// ABRIR BANCO
 // ==========================================
 
 export async function getDatabase() {
-  if (db) {
-    return db;
-  }
+  if (db) return db;
 
   if (!dbPromise) {
     dbPromise = SQLite.openDatabaseAsync('sunny_health.db')
@@ -35,8 +33,61 @@ export async function getDatabase() {
 }
 
 // ==========================================
-// ADICIONAR COLUNA SE NÃO EXISTIR
+// UTILITÁRIOS
 // ==========================================
+
+function numeroOuNull(valor) {
+  if (
+    valor === null ||
+    valor === undefined ||
+    valor === ''
+  ) {
+    return null;
+  }
+
+  const numero = Number(valor);
+
+  return Number.isFinite(numero) ? numero : null;
+}
+
+function obterBPMValido(valor) {
+  const bpm = numeroOuNull(valor);
+
+  if (bpm === null || bpm <= 0 || bpm > 255) {
+    return null;
+  }
+
+  return Math.round(bpm);
+}
+
+function obterDataValida(dados = {}) {
+  let data = null;
+
+  if (dados.recebido_em_timestamp != null) {
+    const timestamp = Number(dados.recebido_em_timestamp);
+
+    if (Number.isFinite(timestamp)) {
+      data = new Date(timestamp);
+    }
+  }
+
+  if (
+    (!data || Number.isNaN(data.getTime())) &&
+    dados.recebido_em
+  ) {
+    const tentativa = new Date(dados.recebido_em);
+
+    if (!Number.isNaN(tentativa.getTime())) {
+      data = tentativa;
+    }
+  }
+
+  if (!data || Number.isNaN(data.getTime())) {
+    data = new Date();
+  }
+
+  return data.toISOString();
+}
 
 async function adicionarColunaSeNecessario(
   database,
@@ -44,7 +95,6 @@ async function adicionarColunaSeNecessario(
   coluna,
   tipo
 ) {
-  // Evita nomes inválidos em comandos SQL.
   const identificadorValido = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
 
   if (
@@ -59,11 +109,7 @@ async function adicionarColunaSeNecessario(
     `PRAGMA table_info(${tabela})`
   );
 
-  const existe = colunas.some(
-    item => item.name === coluna
-  );
-
-  if (!existe) {
+  if (!colunas.some(item => item.name === coluna)) {
     await database.execAsync(
       `ALTER TABLE ${tabela} ADD COLUMN ${coluna} ${tipo}`
     );
@@ -73,7 +119,7 @@ async function adicionarColunaSeNecessario(
 }
 
 // ==========================================
-// MIGRAÇÕES DOS QUESTIONÁRIOS
+// MIGRAÇÃO DOS QUESTIONÁRIOS
 // ==========================================
 
 async function migrarQuestionarios(database) {
@@ -83,25 +129,20 @@ async function migrarQuestionarios(database) {
     ['despertares', 'INTEGER'],
     ['dificuldade_dormir', 'INTEGER'],
     ['descanso', 'INTEGER'],
-
     ['refeicoes_dia', 'INTEGER'],
     ['frutas', 'INTEGER'],
     ['verduras', 'INTEGER'],
     ['ultraprocessados', 'INTEGER'],
     ['agua', 'INTEGER'],
-
     ['humor', 'INTEGER'],
     ['estresse', 'INTEGER'],
     ['relaxamento', 'INTEGER'],
     ['disposicao', 'INTEGER'],
-
     ['atividade_minutos', 'INTEGER'],
     ['atividade_frequencia', 'INTEGER'],
-
     ['tipo_sanguineo', 'TEXT'],
     ['fator_rh', 'TEXT'],
     ['tipagem_confirmada', 'TEXT'],
-
     ['dificuldade_atividades', 'INTEGER'],
     ['criado_em', 'TEXT'],
   ];
@@ -117,11 +158,10 @@ async function migrarQuestionarios(database) {
 }
 
 // ==========================================
-// MIGRAÇÕES APOLLO
+// PREPARAR TABELAS APOLLO
 // ==========================================
 
 async function prepararTabelaApolloInterno(database) {
-  // Criar tabela de medições.
   await database.execAsync(`
     CREATE TABLE IF NOT EXISTS medicoes_apollo (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -136,19 +176,16 @@ async function prepararTabelaApolloInterno(database) {
       giroscopio_z REAL,
 
       intensidade_sonora REAL,
+
       frequencia_cardiaca INTEGER,
 
       recebido_em TEXT,
 
       FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
     );
-  `);
 
-  // Criar tabela de episódios.
-  await database.execAsync(`
     CREATE TABLE IF NOT EXISTS episodios_movimento (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-
       usuario_id INTEGER,
 
       inicio_em TEXT,
@@ -170,7 +207,6 @@ async function prepararTabelaApolloInterno(database) {
     );
   `);
 
-  // Garantir colunas da tabela de medições.
   const colunasMedicoes = [
     ['usuario_id', 'INTEGER'],
     ['aceleracao_x', 'REAL'],
@@ -193,7 +229,6 @@ async function prepararTabelaApolloInterno(database) {
     );
   }
 
-  // Garantir colunas dos episódios.
   const colunasEpisodios = [
     ['usuario_id', 'INTEGER'],
     ['inicio_em', 'TEXT'],
@@ -216,13 +251,15 @@ async function prepararTabelaApolloInterno(database) {
     );
   }
 
-  // Criar índices depois das migrações.
   await database.execAsync(`
     CREATE INDEX IF NOT EXISTS idx_medicoes_usuario
     ON medicoes_apollo(usuario_id);
 
     CREATE INDEX IF NOT EXISTS idx_medicoes_recebido
     ON medicoes_apollo(recebido_em);
+
+    CREATE INDEX IF NOT EXISTS idx_medicoes_bpm
+    ON medicoes_apollo(usuario_id, frequencia_cardiaca);
 
     CREATE INDEX IF NOT EXISTS idx_episodios_usuario
     ON episodios_movimento(usuario_id);
@@ -233,7 +270,7 @@ async function prepararTabelaApolloInterno(database) {
 }
 
 // ==========================================
-// INICIALIZAR BANCO DE DADOS
+// INICIALIZAR BANCO
 // ==========================================
 
 export async function initializeDatabase() {
@@ -293,10 +330,7 @@ export async function initializeDatabase() {
         );
       `);
 
-      // Migrar questionários antigos.
       await migrarQuestionarios(database);
-
-      // Preparar as tabelas Apollo.
       await prepararTabelaApolloInterno(database);
 
       console.log('Banco Sunny Health inicializado.');
@@ -304,12 +338,7 @@ export async function initializeDatabase() {
       return database;
     })().catch(error => {
       inicializacaoPromise = null;
-
-      console.error(
-        'Erro na inicialização do banco:',
-        error
-      );
-
+      console.error('Erro na inicialização do banco:', error);
       throw error;
     });
   }
@@ -322,11 +351,11 @@ export async function initializeDatabase() {
 // ==========================================
 
 export async function prepararTabelaApollo() {
-  return await initializeDatabase();
+  return initializeDatabase();
 }
 
 // ==========================================
-// PEGAR USUÁRIO LOGADO
+// USUÁRIO LOGADO
 // ==========================================
 
 export async function getUsuarioLogado() {
@@ -343,59 +372,11 @@ export async function getUsuarioLogado() {
 }
 
 // ==========================================
-// CONVERTER VALORES NUMÉRICOS
-// ==========================================
-
-function numeroOuNull(valor) {
-  if (
-    valor === null ||
-    valor === undefined ||
-    valor === ''
-  ) {
-    return null;
-  }
-
-  const numero = Number(valor);
-
-  return Number.isFinite(numero) ? numero : null;
-}
-
-function obterDataValida(dados) {
-  let data = null;
-
-  if (dados?.recebido_em_timestamp != null) {
-    const timestamp = Number(dados.recebido_em_timestamp);
-
-    if (Number.isFinite(timestamp)) {
-      data = new Date(timestamp);
-    }
-  }
-
-  if (
-    (!data || Number.isNaN(data.getTime())) &&
-    dados?.recebido_em
-  ) {
-    const tentativa = new Date(dados.recebido_em);
-
-    if (!Number.isNaN(tentativa.getTime())) {
-      data = tentativa;
-    }
-  }
-
-  if (!data || Number.isNaN(data.getTime())) {
-    data = new Date();
-  }
-
-  return data.toISOString();
-}
-
-// ==========================================
 // SALVAR MEDIÇÃO APOLLO
 // ==========================================
 
 export async function salvarMedicaoApollo(dados = {}) {
   const database = await initializeDatabase();
-
   const usuarioId = await getUsuarioLogado();
 
   if (usuarioId == null) {
@@ -404,16 +385,17 @@ export async function salvarMedicaoApollo(dados = {}) {
     );
   }
 
-  const bpm = numeroOuNull(
+  const frequenciaCardiaca = obterBPMValido(
     dados.frequencia_cardiaca
   );
 
-  const frequenciaCardiaca =
-    bpm !== null && bpm > 0
-      ? Math.round(bpm)
-      : null;
-
   const recebidoEm = obterDataValida(dados);
+
+  console.log('========== APOLLO / SQLITE ==========');
+  console.log('BPM recebido:', dados.frequencia_cardiaca);
+  console.log('BPM válido:', frequenciaCardiaca);
+  console.log('Usuário:', usuarioId);
+  console.log('=====================================');
 
   const resultado = await database.runAsync(
     `INSERT INTO medicoes_apollo (
@@ -444,17 +426,14 @@ export async function salvarMedicaoApollo(dados = {}) {
 }
 
 // ==========================================
-// BUSCAR ÚLTIMA MEDIÇÃO
+// BUSCAR ÚLTIMA MEDIÇÃO COMPLETA
 // ==========================================
 
 export async function buscarUltimaMedicaoApollo() {
   const database = await initializeDatabase();
-
   const usuarioId = await getUsuarioLogado();
 
-  if (usuarioId == null) {
-    return null;
-  }
+  if (usuarioId == null) return null;
 
   return await database.getFirstAsync(
     `SELECT *
@@ -467,17 +446,41 @@ export async function buscarUltimaMedicaoApollo() {
 }
 
 // ==========================================
-// BUSCAR HISTÓRICO DE MEDIÇÕES
+// BUSCAR ÚLTIMO BPM VÁLIDO
+// ==========================================
+
+export async function buscarUltimaFrequenciaCardiaca() {
+  const database = await initializeDatabase();
+  const usuarioId = await getUsuarioLogado();
+
+  if (usuarioId == null) return null;
+
+  const resultado = await database.getFirstAsync(
+    `SELECT
+       id,
+       usuario_id,
+       frequencia_cardiaca,
+       recebido_em
+     FROM medicoes_apollo
+     WHERE usuario_id = ?
+       AND frequencia_cardiaca BETWEEN 1 AND 255
+     ORDER BY id DESC
+     LIMIT 1`,
+    usuarioId
+  );
+
+  return resultado ?? null;
+}
+
+// ==========================================
+// HISTÓRICO DE MEDIÇÕES
 // ==========================================
 
 export async function buscarHistoricoApollo(limite = 100) {
   const database = await initializeDatabase();
-
   const usuarioId = await getUsuarioLogado();
 
-  if (usuarioId == null) {
-    return [];
-  }
+  if (usuarioId == null) return [];
 
   const quantidade = Math.max(
     1,
@@ -501,7 +504,6 @@ export async function buscarHistoricoApollo(limite = 100) {
 
 export async function salvarEpisodioMovimento(dados = {}) {
   const database = await initializeDatabase();
-
   const usuarioId = await getUsuarioLogado();
 
   if (usuarioId == null) {
@@ -520,9 +522,7 @@ export async function salvarEpisodioMovimento(dados = {}) {
     !Number.isFinite(duracao) ||
     duracao < 0
   ) {
-    throw new Error(
-      'Dados inválidos para registrar o episódio.'
-    );
+    throw new Error('Dados inválidos para registrar o episódio.');
   }
 
   const resultado = await database.runAsync(
@@ -557,12 +557,9 @@ export async function salvarEpisodioMovimento(dados = {}) {
 
 export async function buscarEpisodiosMovimento(limite = 100) {
   const database = await initializeDatabase();
-
   const usuarioId = await getUsuarioLogado();
 
-  if (usuarioId == null) {
-    return [];
-  }
+  if (usuarioId == null) return [];
 
   const quantidade = Math.max(
     1,
@@ -586,7 +583,6 @@ export async function buscarEpisodiosMovimento(limite = 100) {
 
 export async function buscarResumoEpisodiosMovimento() {
   const database = await initializeDatabase();
-
   const usuarioId = await getUsuarioLogado();
 
   const resumoVazio = {
@@ -597,9 +593,7 @@ export async function buscarResumoEpisodiosMovimento() {
     ultimo_episodio: null,
   };
 
-  if (usuarioId == null) {
-    return resumoVazio;
-  }
+  if (usuarioId == null) return resumoVazio;
 
   const resumo = await database.getFirstAsync(
     `SELECT

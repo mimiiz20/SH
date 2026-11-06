@@ -1,9 +1,20 @@
+
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import {Alert,PermissionsAndroid,Platform,ScrollView,StyleSheet,Text,TouchableOpacity,View,} from 'react-native';
+import {
+  Alert,
+  PermissionsAndroid,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { BleManager } from 'react-native-ble-plx';
 import { Buffer } from 'buffer';
+
 import {
   salvarMedicaoApollo,
   buscarUltimaMedicaoApollo,
@@ -11,8 +22,10 @@ import {
 
 const SERVICE_UUID = '12345678-1234-1234-1234-1234567890ab';
 const DATA_UUID = '12345678-1234-1234-1234-1234567890ac';
+
 const TAMANHO_PACOTE_ATUAL = 14;
 const TAMANHO_PACOTE_COM_BATIMENTO = 16;
+
 const manager = new BleManager();
 
 const C = {
@@ -40,27 +53,45 @@ function interpretarPacoteApollo(base64) {
   const lerInt16 = (posicao) =>
     bytes.readInt16LE(posicao * 2);
 
+  // Os primeiros 14 bytes continuam iguais.
+  const aceleracao_x = lerInt16(0) / 1000;
+  const aceleracao_y = lerInt16(1) / 1000;
+  const aceleracao_z = lerInt16(2) / 1000;
+
+  const giroscopio_x = lerInt16(3) / 10;
+  const giroscopio_y = lerInt16(4) / 10;
+  const giroscopio_z = lerInt16(5) / 10;
+
+  const intensidade_sonora = lerInt16(6) / 10000;
+
+  // Os bytes 14 e 15 recebem o BPM como uint16 little-endian.
   const possuiBatimento =
-    bytes.length === TAMANHO_PACOTE_COM_BATIMENTO;
+    bytes.length >= TAMANHO_PACOTE_COM_BATIMENTO;
 
   const bpmBruto = possuiBatimento
     ? bytes.readUInt16LE(14)
     : null;
 
   const frequenciaCardiaca =
-    bpmBruto !== null && bpmBruto > 0
+    bpmBruto !== null &&
+    bpmBruto >= 1 &&
+    bpmBruto <= 255
       ? bpmBruto
       : null;
 
   return {
-    aceleracao_x: lerInt16(0) / 1000,
-    aceleracao_y: lerInt16(1) / 1000,
-    aceleracao_z: lerInt16(2) / 1000,
-    giroscopio_x: lerInt16(3) / 10,
-    giroscopio_y: lerInt16(4) / 10,
-    giroscopio_z: lerInt16(5) / 10,
-    intensidade_sonora: lerInt16(6) / 10000,
+    aceleracao_x,
+    aceleracao_y,
+    aceleracao_z,
+
+    giroscopio_x,
+    giroscopio_y,
+    giroscopio_z,
+
+    intensidade_sonora,
+
     frequencia_cardiaca: frequenciaCardiaca,
+
     recebido_em: new Date().toISOString(),
   };
 }
@@ -104,8 +135,10 @@ export default function Bluetooth() {
   const assinaturaEstadoRef = useRef(null);
   const timeoutBuscaRef = useRef(null);
   const ativoRef = useRef(true);
+
   const ultimaAtualizacaoRef = useRef(0);
   const ultimaGravacaoRef = useRef(0);
+
   const gravandoRef = useRef(false);
   const dadosPendentesRef = useRef(null);
 
@@ -137,6 +170,7 @@ export default function Bluetooth() {
 
     return () => {
       ativoRef.current = false;
+
       manager.stopDeviceScan();
 
       if (timeoutBuscaRef.current) {
@@ -153,6 +187,7 @@ export default function Bluetooth() {
     };
   }, []);
 
+  // Salva as medições, incluindo a frequência cardíaca.
   const gravarMedicao = useCallback(async (dados) => {
     dadosPendentesRef.current = dados;
 
@@ -176,6 +211,7 @@ export default function Bluetooth() {
     }
   }, []);
 
+  // Recebe e interpreta os pacotes BLE.
   const receberDados = useCallback(
     (erro, caracteristica) => {
       if (!ativoRef.current) return;
@@ -438,6 +474,7 @@ export default function Bluetooth() {
   const Cartao = ({ titulo, valor, unidade = '' }) => (
     <View style={styles.cartaoMedicao}>
       <Text style={styles.rotulo}>{titulo}</Text>
+
       <Text style={styles.valor}>
         {valor === null || valor === undefined
           ? '--'
@@ -570,7 +607,7 @@ export default function Bluetooth() {
               </Text>
 
               <Text style={styles.cardiacoDescricao}>
-                Dados recebidos do sensor cardíaco
+                Dados recebidos do sensor MAX30102
               </Text>
             </View>
           </View>
@@ -586,8 +623,9 @@ export default function Bluetooth() {
           </View>
 
           <Text style={styles.cardiacoRodape}>
-            A leitura ficará disponível quando o sensor
-            cardíaco estiver integrado e enviando dados.
+            {medicao?.frequencia_cardiaca
+              ? 'Leitura recebida pelo sensor. A qualidade depende do contato e do sinal.'
+              : 'Aguardando uma leitura válida do sensor cardíaco.'}
           </Text>
         </View>
 
@@ -635,9 +673,9 @@ export default function Bluetooth() {
         <Text style={styles.rodape}>
           Os dados são provenientes dos sensores da pulseira.
           A intensidade sonora representa o nível do sinal
-          captado, não uma gravação de voz. Os valores de
-          frequência cardíaca dependem da integração do sensor
-          correspondente.
+          captado, não uma gravação de voz. A frequência
+          cardíaca é uma estimativa experimental e não substitui
+          uma medição ou avaliação clínica.
         </Text>
       </ScrollView>
     </SafeAreaView>
