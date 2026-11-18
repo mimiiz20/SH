@@ -1,0 +1,17 @@
+allprojects {
+    afterEvaluate { p ->
+        if (p.path == ':expo-dev-launcher') {
+            def release = p.extensions.getByName('android').sourceSets.getByName('release')
+
+            println "\n===== FONTES DO RELEASE ====="
+
+            release.java.srcDirs.each { dir ->
+                println "PASTA: ${dir}"
+                println "EXISTE: ${dir.exists()}"
+
+                def target = new File(dir, 'expo/modules/devlauncher/DevLauncherPackageDelegate.kt')
+                println "ARQUIVO ENCONTRADO: ${target.exists()}"
+            }
+        }
+    }
+}

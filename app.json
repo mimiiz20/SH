@@ -1,0 +1,39 @@
+{
+  "expo": {
+    "name": "Sunny Health",
+    "slug": "sunny-health",
+    "version": "1.0.0",
+
+    "icon": "./assets/images/Logo.png",
+
+    "scheme": "sunnyhealth",
+
+    "plugins": [
+      "expo-asset",
+      "expo-router",
+      "react-native-ble-plx",
+      "expo-sqlite",
+      "expo-font"
+    ],
+
+    "android": {
+      "package": "com.sunnyhealth.app",
+      "permissions": [
+        "android.permission.BLUETOOTH",
+        "android.permission.BLUETOOTH_ADMIN",
+        "android.permission.BLUETOOTH_CONNECT"
+      ],
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/Logo.png",
+        "backgroundColor": "#FFFFFF"
+      }
+    },
+
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "7ed8038a-2cc4-4f9d-8ae5-aea6508c40b7"
+      }
+    }
+  }
+}
