@@ -640,7 +640,7 @@ export default function Questionario() {
             <TouchableOpacity
               style={styles.botaoEntrar}
               activeOpacity={0.85}
-              onPress={() => router.replace('/relogio')}
+              onPress={() => router.replace('/batisono')} 
             >
               <Text style={styles.botaoEntrarTexto}>
                 ENTRAR NO SUNNY HEALTH

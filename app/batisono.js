@@ -609,52 +609,60 @@ export default function BatiSono() {
         <View pointerEvents="none" style={styles.glowOne} />
         <View pointerEvents="none" style={styles.glowTwo} />
 
-        {/* NAVBAR SUPERIOR */}
+{/* NAVBAR SUPERIOR */}
 
-        <View
-          style={[
-            styles.topSafeArea,
-            { paddingTop: insets.top },
-          ]}
-        >
-          <View style={styles.navbar}>
-            <TouchableOpacity
-              style={styles.botaoPerfil}
-              onPress={() => navegar('/config')}
-              accessibilityLabel="Abrir configurações"
-            >
-              <Ionicons
-                name="settings-outline"
-                size={24}
-                color={C.texto}
-              />
-            </TouchableOpacity>
+<View
+  style={[
+    styles.topSafeArea,
+    { paddingTop: insets.top },
+  ]}
+>
+  <View style={styles.navbar}>
 
-          <TouchableOpacity
-            style={styles.botaoPerfil}
-            onPress={() => navegar('/chatbot')}
-            accessibilityLabel="Abrir assistente virtual"
-          >
-            <Ionicons
-              name="chatbubbles-outline"
-              size={24}
-              color={C.texto}
-            />
-          </TouchableOpacity>
+    {/* GRUPO: CONFIGURAÇÕES + CHATBOT */}
+    <View style={styles.grupoBotoesEsquerda}>
 
-            <TouchableOpacity
-              style={styles.botaoPerfil}
-              onPress={() => navegar('/perfil')}
-              accessibilityLabel="Abrir perfil"
-            >
-              <Ionicons
-                name="person-outline"
-                size={24}
-                color={C.texto}
-              />
-            </TouchableOpacity>
-          </View>
-        </View>
+      <TouchableOpacity
+        style={styles.botaoPerfil}
+        onPress={() => navegar('/config')}
+        accessibilityLabel="Abrir configurações"
+      >
+        <Ionicons
+          name="settings-outline"
+          size={24}
+          color={C.texto}
+        />
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={styles.botaoPerfil}
+        onPress={() => navegar('/chatbot')}
+        accessibilityLabel="Abrir assistente virtual"
+      >
+        <Ionicons
+          name="chatbubbles-outline"
+          size={24}
+          color={C.texto}
+        />
+      </TouchableOpacity>
+
+    </View>
+
+    {/* PERFIL À DIREITA */}
+    <TouchableOpacity
+      style={styles.botaoPerfil}
+      onPress={() => navegar('/perfil')}
+      accessibilityLabel="Abrir perfil"
+    >
+      <Ionicons
+        name="person-outline"
+        size={24}
+        color={C.texto}
+      />
+    </TouchableOpacity>
+
+  </View>
+</View>
 
         <View style={styles.conteudoPrincipal}>
           <ScrollView
@@ -1343,6 +1351,12 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 22,
     zIndex: 2,
     marginHorizontal: -17,
+  },
+
+  grupoBotoesEsquerda: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
 
   navbar: {

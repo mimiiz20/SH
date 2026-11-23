@@ -1,5 +1,16 @@
-import React from 'react';
-import {KeyboardAvoidingView,Platform,ScrollView,StyleSheet,Text,TextInput,TouchableOpacity,View,} from 'react-native';
+
+import React, { useEffect, useRef, useState } from 'react';
+import {
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -21,11 +32,51 @@ const C = {
 };
 
 // ==========================================
+// CONEXÃO COM O BACKEND
+// ==========================================
+
+// Substitua pelo IPv4 do notebook.
+const API_URL = 'http://192.168.1.5:3000/chat';
+
+// ==========================================
 // TELA PRINCIPAL
 // ==========================================
 
 export default function Chatbot() {
   const insets = useSafeAreaInsets();
+
+  const [mensagens, setMensagens] = useState([
+    {
+      id: 'inicial',
+      role: 'assistant',
+      content:
+        'É um prazer conversar com você!\n\nVocê pode me perguntar sobre Parkinson, cuidados no dia a dia, bem-estar ou outros assuntos relacionados à sua rotina.\n\nPor onde gostaria de começar?',
+      horario: 'Agora',
+    },
+  ]);
+
+  const [texto, setTexto] = useState('');
+  const [carregando, setCarregando] = useState(false);
+
+  const scrollRef = useRef(null);
+
+  // ==========================================
+  // ROLAGEM AUTOMÁTICA
+  // ==========================================
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      scrollRef.current?.scrollToEnd({
+        animated: true,
+      });
+    }, 100);
+
+    return () => clearTimeout(timer);
+  }, [mensagens, carregando]);
+
+  // ==========================================
+  // VOLTAR
+  // ==========================================
 
   const voltar = () => {
     if (router.canGoBack()) {
@@ -34,6 +85,101 @@ export default function Chatbot() {
       router.replace('/batisono');
     }
   };
+
+  // ==========================================
+  // ENVIAR MENSAGEM
+  // ==========================================
+
+  const enviarMensagem = async (mensagemPersonalizada) => {
+    const mensagemTexto = (
+      mensagemPersonalizada ?? texto
+    ).trim();
+
+    if (!mensagemTexto || carregando) return;
+
+    const mensagemUsuario = {
+      id: Date.now().toString(),
+      role: 'user',
+      content: mensagemTexto,
+      horario: 'Agora',
+    };
+
+    setMensagens((anterior) => [
+      ...anterior,
+      mensagemUsuario,
+    ]);
+
+    setTexto('');
+    setCarregando(true);
+
+    try {
+      const historico = mensagens.map((item) => ({
+        role: item.role,
+        content: item.content,
+      }));
+
+      const resposta = await fetch(API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          mensagem: mensagemTexto,
+          historico,
+        }),
+      });
+
+      const dados = await resposta.json();
+
+      if (!resposta.ok) {
+        throw new Error(
+          dados.erro || 'Não foi possível obter uma resposta.'
+        );
+      }
+
+      if (!dados.resposta) {
+        throw new Error('Resposta não encontrada.');
+      }
+
+      setMensagens((anterior) => [
+        ...anterior,
+        {
+          id: (Date.now() + 1).toString(),
+          role: 'assistant',
+          content: dados.resposta,
+          horario: 'Agora',
+        },
+      ]);
+
+    } catch (erro) {
+      console.error('Erro ao conversar com Sunny:', erro);
+
+      setMensagens((anterior) => [
+        ...anterior,
+        {
+          id: (Date.now() + 2).toString(),
+          role: 'assistant',
+          content:
+            'Não consegui me conectar ao servidor neste momento. Verifique se o backend e o Ollama estão funcionando e tente novamente.',
+          horario: 'Agora',
+        },
+      ]);
+
+    } finally {
+      setCarregando(false);
+    }
+  };
+
+  // ==========================================
+  // SUGESTÕES
+  // ==========================================
+
+  const sugestoes = [
+    'Entendendo o Parkinson',
+    'Cuidados no dia a dia',
+    'Bem-estar e qualidade de vida',
+    'Dúvidas sobre sintomas',
+  ];
 
   return (
     <View style={styles.safeArea}>
@@ -83,7 +229,9 @@ export default function Chatbot() {
         >
 
           <ScrollView
+            ref={scrollRef}
             showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
             contentContainerStyle={styles.scrollContent}
           >
 
@@ -105,77 +253,106 @@ export default function Chatbot() {
               </Text>
             </View>
 
-            {/* MENSAGEM INICIAL */}
+            {/* MENSAGENS */}
 
-            <View style={styles.mensagemArea}>
+            {mensagens.map((mensagem) => {
+              const usuario = mensagem.role === 'user';
 
-              <View style={styles.mensagemCabecalho}>
+              return (
+                <View
+                  key={mensagem.id}
+                  style={[
+                    styles.mensagemArea,
+                    usuario && styles.mensagemUsuarioArea,
+                  ]}
+                >
+
+                  <View style={styles.mensagemCabecalho}>
+
+                    <View
+                      style={[
+                        styles.mensagemAvatar,
+                        usuario && styles.mensagemAvatarUsuario,
+                      ]}
+                    >
+                      <Text style={styles.mensagemAvatarTexto}>
+                        {usuario ? 'V' : 'S'}
+                      </Text>
+                    </View>
+
+                    <Text style={styles.nomeAssistente}>
+                      {usuario ? 'Você' : 'Sunny'}
+                    </Text>
+
+                    <Text style={styles.horario}>
+                      {mensagem.horario}
+                    </Text>
+
+                  </View>
+
+                  <View
+                    style={[
+                      styles.balaoAssistente,
+                      usuario && styles.balaoUsuario,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.textoMensagem,
+                        usuario && styles.textoMensagemUsuario,
+                      ]}
+                    >
+                      {mensagem.content}
+                    </Text>
+                  </View>
+
+                </View>
+              );
+            })}
+
+            {/* CARREGAMENTO */}
+
+            {carregando && (
+              <View style={styles.carregandoArea}>
                 <View style={styles.mensagemAvatar}>
                   <Text style={styles.mensagemAvatarTexto}>S</Text>
                 </View>
 
-                <Text style={styles.nomeAssistente}>
-                  Sunny
-                </Text>
+                <ActivityIndicator
+                  size="small"
+                  color={C.azul}
+                />
 
-                <Text style={styles.horario}>
-                  Agora
-                </Text>
-              </View>
-
-              <View style={styles.balaoAssistente}>
-                <Text style={styles.textoMensagem}>
-                  É um prazer conversar com você!
-
-                  {'\n\n'}
-
-                  Você pode me perguntar sobre Parkinson,
-                  cuidados no dia a dia, bem-estar ou outros
-                  assuntos relacionados à sua rotina.
-
-                  {'\n\n'}
-
-                  Por onde gostaria de começar?
+                <Text style={styles.carregandoTexto}>
+                  Sunny está preparando uma resposta...
                 </Text>
               </View>
+            )}
 
-            </View>
+            {/* SUGESTÕES */}
 
-            {/* SUGESTÕES DE CONVERSA */}
+            {mensagens.length === 1 && (
+              <View style={styles.sugestoesArea}>
+                <Text style={styles.sugestoesTitulo}>
+                  ASSUNTOS QUE VOCÊ PODE EXPLORAR
+                </Text>
 
-            <View style={styles.sugestoesArea}>
-              <Text style={styles.sugestoesTitulo}>
-                ASSUNTOS QUE VOCÊ PODE EXPLORAR
-              </Text>
-
-              <View style={styles.sugestoesLista}>
-
-                <View style={styles.sugestao}>
-                  <Text style={styles.sugestaoTexto}>
-                    Entendendo o Parkinson
-                  </Text>
+                <View style={styles.sugestoesLista}>
+                  {sugestoes.map((sugestao) => (
+                    <TouchableOpacity
+                      key={sugestao}
+                      style={styles.sugestao}
+                      onPress={() => enviarMensagem(sugestao)}
+                      disabled={carregando}
+                    >
+                      <Text style={styles.sugestaoTexto}>
+                        {sugestao}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
                 </View>
-
-                <View style={styles.sugestao}>
-                  <Text style={styles.sugestaoTexto}>
-                    Cuidados no dia a dia
-                  </Text>
-                </View>
-
-                <View style={styles.sugestao}>
-                  <Text style={styles.sugestaoTexto}>
-                    Bem-estar e qualidade de vida
-                  </Text>
-                </View>
-
-                <View style={styles.sugestao}>
-                  <Text style={styles.sugestaoTexto}>
-                    Dúvidas sobre sintomas
-                  </Text>
-                </View>
-
               </View>
-            </View>
+            )}
 
             {/* AVISO */}
 
@@ -211,21 +388,33 @@ export default function Chatbot() {
                 placeholder="Digite sua mensagem..."
                 placeholderTextColor={C.secundario}
                 multiline
-                editable={false}
+                editable={!carregando}
+                value={texto}
+                onChangeText={setTexto}
+                maxLength={2000}
               />
 
-              <View style={styles.botaoEnviar}>
+              <TouchableOpacity
+                style={[
+                  styles.botaoEnviar,
+                  (!texto.trim() || carregando) &&
+                    styles.botaoEnviarDesabilitado,
+                ]}
+                onPress={() => enviarMensagem()}
+                disabled={!texto.trim() || carregando}
+                accessibilityLabel="Enviar mensagem"
+              >
                 <Ionicons
                   name="arrow-up"
                   size={22}
                   color={C.branco}
                 />
-              </View>
+              </TouchableOpacity>
 
             </View>
 
             <Text style={styles.textoCompositor}>
-              Assistente virtual em fase de desenvolvimento.
+              Assistente virtual com inteligência artificial.
             </Text>
 
           </View>
@@ -353,10 +542,14 @@ const styles = StyleSheet.create({
     marginTop: 9,
   },
 
-  // MENSAGEM
+  // MENSAGENS
 
   mensagemArea: {
     marginBottom: 25,
+  },
+
+  mensagemUsuarioArea: {
+    alignItems: 'flex-end',
   },
 
   mensagemCabecalho: {
@@ -373,6 +566,10 @@ const styles = StyleSheet.create({
     backgroundColor: C.azul,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+
+  mensagemAvatarUsuario: {
+    backgroundColor: C.roxo,
   },
 
   mensagemAvatarTexto: {
@@ -406,10 +603,34 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
 
+  balaoUsuario: {
+    backgroundColor: C.azul,
+    borderTopLeftRadius: 19,
+    borderTopRightRadius: 5,
+  },
+
   textoMensagem: {
     color: C.texto,
     fontSize: 13,
     lineHeight: 21,
+  },
+
+  textoMensagemUsuario: {
+    color: C.branco,
+  },
+
+  // CARREGAMENTO
+
+  carregandoArea: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 20,
+  },
+
+  carregandoTexto: {
+    color: C.secundario,
+    fontSize: 11,
   },
 
   // SUGESTÕES
@@ -509,6 +730,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginLeft: 8,
+  },
+
+  botaoEnviarDesabilitado: {
     opacity: 0.65,
   },
 
